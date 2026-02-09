@@ -1,12 +1,9 @@
+"use client";
+
+import { use } from "react";
 import Editor from "@/components/drafts/Editor";
-import { drafts } from "@/data/dummy";
 
-export function generateStaticParams() {
-  return drafts.map((draft) => ({
-    id: draft.id,
-  }));
-}
-
-export default function DraftEditorPage() {
-  return <Editor />;
+export default function DraftEditorPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return <Editor draftId={id} />;
 }

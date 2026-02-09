@@ -1,5 +1,5 @@
 import Card from "@/components/ui/Card";
-import { recentActivity } from "@/data/dummy";
+import type { Activity } from "@/hooks/useStats";
 
 const typeIcons: Record<string, { bg: string; color: string }> = {
   curated: { bg: "bg-blue-100", color: "text-blue-600" },
@@ -8,26 +8,34 @@ const typeIcons: Record<string, { bg: string; color: string }> = {
   topic: { bg: "bg-amber-100", color: "text-amber-600" },
 };
 
-export default function RecentActivity() {
+interface RecentActivityProps {
+  activities: Activity[];
+}
+
+export default function RecentActivity({ activities }: RecentActivityProps) {
   return (
     <Card>
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-      <div className="space-y-4">
-        {recentActivity.map((activity, idx) => {
-          const icon = typeIcons[activity.type] || typeIcons.curated;
-          return (
-            <div key={idx} className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-full ${icon.bg} flex items-center justify-center shrink-0 mt-0.5`}>
-                <div className={`w-2 h-2 rounded-full ${icon.color.replace("text-", "bg-")}`} />
+      {activities.length === 0 ? (
+        <p className="text-sm text-gray-400">No recent activity. Start by adding topics and curating content.</p>
+      ) : (
+        <div className="space-y-4">
+          {activities.map((activity, idx) => {
+            const icon = typeIcons[activity.type] || typeIcons.curated;
+            return (
+              <div key={idx} className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full ${icon.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                  <div className={`w-2 h-2 rounded-full ${icon.color.replace("text-", "bg-")}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-700">{activity.message}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{activity.time}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-700">{activity.message}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{activity.time}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }

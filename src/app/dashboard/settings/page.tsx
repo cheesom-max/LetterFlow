@@ -1,30 +1,130 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
+import { useUser } from "@/hooks/useUser";
+import type { Profile, PlatformConnection } from "@/lib/database.types";
 
-const platforms = [
-  {
-    name: "Beehiiv",
+const platformMeta: Record<string, { label: string; description: string; color: string }> = {
+  beehiiv: {
+    label: "Beehiiv",
     description: "Connect your Beehiiv account to publish directly",
-    connected: true,
     color: "bg-amber-500",
   },
-  {
-    name: "Substack",
+  substack: {
+    label: "Substack",
     description: "Publish newsletters to your Substack",
-    connected: false,
     color: "bg-orange-500",
   },
-  {
-    name: "Kit (ConvertKit)",
+  kit: {
+    label: "Kit (ConvertKit)",
     description: "Send newsletters via Kit email platform",
-    connected: false,
     color: "bg-blue-500",
   },
-];
+};
 
 export default function SettingsPage() {
+  const { supabase, user } = useUser();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [connections, setConnections] = useState<PlatformConnection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Profile form
+  const [fullName, setFullName] = useState("");
+  const [newsletterName, setNewsletterName] = useState("");
+
+  // Connect modal
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
+  const [connectPlatform, setConnectPlatform] = useState<"beehiiv" | "substack" | "kit">("beehiiv");
+  const [apiKey, setApiKey] = useState("");
+  const [publicationId, setPublicationId] = useState("");
+  const [connecting, setConnecting] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchData = async () => {
+      const [profileRes, connectionsRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("platform_connections").select("*"),
+      ]);
+
+      if (profileRes.data) {
+        setProfile(profileRes.data);
+        setFullName(profileRes.data.full_name || "");
+        setNewsletterName(profileRes.data.newsletter_name || "");
+      }
+
+      setConnections(connectionsRes.data || []);
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [supabase, user]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setSaving(true);
+    await supabase.from("profiles").update({
+      full_name: fullName,
+      newsletter_name: newsletterName,
+    }).eq("id", user.id);
+    setSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
+  };
+
+  const handleConnect = async () => {
+    if (!user || !apiKey) return;
+    setConnecting(true);
+    await supabase.from("platform_connections").insert({
+      user_id: user.id,
+      platform: connectPlatform,
+      api_key: apiKey,
+      publication_id: publicationId || null,
+      is_active: true,
+    });
+    // Refresh connections
+    const { data } = await supabase.from("platform_connections").select("*");
+    setConnections(data || []);
+    setConnecting(false);
+    setConnectModalOpen(false);
+    setApiKey("");
+    setPublicationId("");
+  };
+
+  const handleDisconnect = async (id: string) => {
+    if (!confirm("Disconnect this platform?")) return;
+    await supabase.from("platform_connections").delete().eq("id", id);
+    setConnections((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const openConnectModal = (platform: "beehiiv" | "substack" | "kit") => {
+    setConnectPlatform(platform);
+    setApiKey("");
+    setPublicationId("");
+    setConnectModalOpen(true);
+  };
+
+  const getConnection = (platform: string) =>
+    connections.find((c) => c.platform === platform && c.is_active);
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl space-y-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-48 bg-gray-100 rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl space-y-8">
       {/* Profile */}
@@ -32,12 +132,32 @@ export default function SettingsPage() {
         <h3 className="text-lg font-semibold text-gray-900 mb-6">Profile</h3>
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
-            <Input label="Full Name" defaultValue="John Doe" />
-            <Input label="Email" type="email" defaultValue="john@example.com" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+            <Input label="Email" type="email" value={user?.email || ""} disabled />
           </div>
-          <Input label="Newsletter Name" defaultValue="The Weekly Digest" />
-          <div className="pt-2">
-            <Button>Save Changes</Button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Newsletter Name</label>
+            <input
+              type="text"
+              value={newsletterName}
+              onChange={(e) => setNewsletterName(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="My Weekly Newsletter"
+            />
+          </div>
+          <div className="pt-2 flex items-center gap-3">
+            <Button onClick={handleSaveProfile} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+            {saveSuccess && <span className="text-sm text-green-600">Saved!</span>}
           </div>
         </div>
       </Card>
@@ -64,45 +184,17 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        {profile?.style_profile && (
+          <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div>
-                <p className="text-sm font-medium text-gray-700">weekly-ai-roundup-jan.md</p>
-                <p className="text-xs text-gray-400">Uploaded 3 days ago</p>
-              </div>
+              <span className="text-sm font-semibold text-indigo-700">Style Profile Active</span>
             </div>
-            <Badge variant="success">Analyzed</Badge>
+            <p className="text-xs text-indigo-600">{profile.style_profile}</p>
           </div>
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-gray-700">saas-metrics-dec.md</p>
-                <p className="text-xs text-gray-400">Uploaded 3 days ago</p>
-              </div>
-            </div>
-            <Badge variant="success">Analyzed</Badge>
-          </div>
-        </div>
-
-        <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-sm font-semibold text-indigo-700">Style Profile Active</span>
-          </div>
-          <p className="text-xs text-indigo-600">
-            Detected: Conversational tone, short paragraphs, bold key takeaways,
-            uses &ldquo;you&rdquo; frequently. Match confidence: 94%.
-          </p>
-        </div>
+        )}
       </Card>
 
       {/* Platform Integrations */}
@@ -111,40 +203,88 @@ export default function SettingsPage() {
           Platform Integrations
         </h3>
         <div className="space-y-4">
-          {platforms.map((platform) => (
-            <div
-              key={platform.name}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${platform.color} rounded-lg flex items-center justify-center`}>
-                  <span className="text-white font-bold text-xs">
-                    {platform.name.charAt(0)}
-                  </span>
+          {(["beehiiv", "substack", "kit"] as const).map((platform) => {
+            const meta = platformMeta[platform];
+            const conn = getConnection(platform);
+            return (
+              <div
+                key={platform}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 ${meta.color} rounded-lg flex items-center justify-center`}>
+                    <span className="text-white font-bold text-xs">
+                      {meta.label.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {meta.label}
+                    </p>
+                    <p className="text-xs text-gray-500">{meta.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {platform.name}
-                  </p>
-                  <p className="text-xs text-gray-500">{platform.description}</p>
-                </div>
+                {conn ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="success">Connected</Badge>
+                    <button
+                      onClick={() => handleDisconnect(conn.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 cursor-pointer"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => openConnectModal(platform)}>
+                    Connect
+                  </Button>
+                )}
               </div>
-              {platform.connected ? (
-                <div className="flex items-center gap-2">
-                  <Badge variant="success">Connected</Badge>
-                  <button className="text-xs text-gray-400 hover:text-red-500">
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <Button variant="secondary" size="sm">
-                  Connect
-                </Button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
+
+      {/* Connect Platform Modal */}
+      <Modal
+        isOpen={connectModalOpen}
+        onClose={() => setConnectModalOpen(false)}
+        title={`Connect ${platformMeta[connectPlatform]?.label}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="Enter your API key"
+              required
+            />
+          </div>
+          {connectPlatform === "beehiiv" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Publication ID</label>
+              <input
+                type="text"
+                value={publicationId}
+                onChange={(e) => setPublicationId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="pub_xxxxxxxx"
+              />
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setConnectModalOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button onClick={handleConnect} disabled={connecting || !apiKey} className="flex-1">
+              {connecting ? "Connecting..." : "Connect"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

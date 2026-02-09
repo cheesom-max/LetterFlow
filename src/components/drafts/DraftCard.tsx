@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { Draft } from "@/data/dummy";
+import type { Draft } from "@/lib/database.types";
 
 const statusMap: Record<Draft["status"], { variant: "default" | "success" | "warning" | "info" | "purple"; label: string }> = {
   draft: { variant: "default", label: "Draft" },
@@ -10,8 +10,21 @@ const statusMap: Record<Draft["status"], { variant: "default" | "success" | "war
   published: { variant: "success", label: "Published" },
 };
 
-export default function DraftCard({ id, title, preview, status, createdAt, wordCount, sourcesUsed }: Draft) {
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffH < 1) return "Just now";
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return `${diffD}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+export default function DraftCard({ id, title, content, status, created_at, word_count, sources_used }: Draft) {
   const s = statusMap[status];
+  const preview = content ? content.replace(/^#.*\n/gm, "").trim().slice(0, 150) + "..." : "No content yet";
 
   return (
     <Link href={`/dashboard/drafts/${id}`}>
@@ -28,9 +41,9 @@ export default function DraftCard({ id, title, preview, status, createdAt, wordC
           </div>
         </div>
         <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-400">
-          <span>{createdAt}</span>
-          <span>{wordCount} words</span>
-          <span>{sourcesUsed} sources</span>
+          <span>{formatDate(created_at)}</span>
+          <span>{word_count} words</span>
+          <span>{sources_used} sources</span>
         </div>
       </Card>
     </Link>

@@ -1,4 +1,4 @@
-import { Stat } from "@/data/dummy";
+import type { Stat } from "@/hooks/useStats";
 
 const iconMap: Record<string, { gradient: string; icon: React.ReactNode }> = {
   "Monitored Topics": {
