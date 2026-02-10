@@ -25,7 +25,28 @@ export async function GET(request: Request) {
       }
     );
 
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      console.error("OAuth code exchange failed:", error.message);
+      return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
+    }
+
+    // Check if profile needs onboarding (no interests = new Google OAuth user)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("interests")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.interests || profile.interests.length === 0) {
+        return NextResponse.redirect(`${origin}/dashboard/onboarding`);
+      }
+    }
   }
 
   return NextResponse.redirect(`${origin}/dashboard`);

@@ -9,6 +9,7 @@ create table public.profiles (
   email text not null,
   full_name text,
   newsletter_name text,
+  interests text[] default '{}',
   plan text default 'free' check (plan in ('free', 'starter', 'pro', 'team')),
   style_profile text,
   created_at timestamptz default now()
@@ -175,8 +176,18 @@ create trigger set_drafts_updated_at
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email);
+  insert into public.profiles (id, email, full_name, newsletter_name, interests)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data ->> 'full_name',
+    new.raw_user_meta_data ->> 'newsletter_name',
+    case
+      when new.raw_user_meta_data -> 'interests' is not null
+      then array(select jsonb_array_elements_text(new.raw_user_meta_data -> 'interests'))
+      else '{}'
+    end
+  );
   return new;
 end;
 $$ language plpgsql security definer;

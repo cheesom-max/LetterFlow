@@ -1,0 +1,21 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/ai-transform/route": "/api/ai-transform",
+  "/api/curate/route": "/api/curate",
+  "/api/generate-draft/route": "/api/generate-draft",
+  "/api/publish/route": "/api/publish",
+  "/api/subject-lines/route": "/api/subject-lines",
+  "/auth/callback/route": "/auth/callback",
+  "/auth/login/page": "/auth/login",
+  "/auth/signup/page": "/auth/signup",
+  "/dashboard/drafts/[id]/page": "/dashboard/drafts/[id]",
+  "/dashboard/drafts/page": "/dashboard/drafts",
+  "/dashboard/feed/page": "/dashboard/feed",
+  "/dashboard/onboarding/page": "/dashboard/onboarding",
+  "/dashboard/page": "/dashboard",
+  "/dashboard/settings/page": "/dashboard/settings",
+  "/dashboard/topics/page": "/dashboard/topics",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/"
+}

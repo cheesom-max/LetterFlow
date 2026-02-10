@@ -2,23 +2,12 @@
 
 import Badge from "@/components/ui/Badge";
 import type { Article } from "@/lib/database.types";
+import { formatDate } from "@/lib/utils";
 
 interface FeedCardProps {
   article: Article & { topic_name: string };
   onBookmark: (id: string) => void;
   onAddToDraft?: (id: string) => void;
-}
-
-function formatDate(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffH = Math.floor(diffMs / (1000 * 60 * 60));
-  if (diffH < 1) return "Just now";
-  if (diffH < 24) return `${diffH}h ago`;
-  const diffD = Math.floor(diffH / 24);
-  if (diffD < 7) return `${diffD}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export default function FeedCard({ article, onBookmark, onAddToDraft }: FeedCardProps) {

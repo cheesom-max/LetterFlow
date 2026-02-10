@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import type { Topic } from "@/lib/database.types";
@@ -21,14 +21,18 @@ interface TopicModalProps {
 const categories = ["Technology", "Business", "Creator", "Marketing", "Finance", "Other"];
 
 export default function TopicModal({ isOpen, onClose, onSubmit, topic }: TopicModalProps) {
-  const [name, setName] = useState("");
-  const [keywords, setKeywords] = useState("");
-  const [rssUrls, setRssUrls] = useState("");
-  const [category, setCategory] = useState("Technology");
-  const [isActive, setIsActive] = useState(true);
+  const [name, setName] = useState(topic?.name || "");
+  const [keywords, setKeywords] = useState(topic?.keywords.join(", ") || "");
+  const [rssUrls, setRssUrls] = useState(topic?.rss_urls.join("\n") || "");
+  const [category, setCategory] = useState(topic?.category || "Technology");
+  const [isActive, setIsActive] = useState(topic?.is_active ?? true);
   const [saving, setSaving] = useState(false);
+  const [prevKey, setPrevKey] = useState("");
 
-  useEffect(() => {
+  // Sync form state from props during render (React 19 pattern)
+  const key = `${isOpen}-${topic?.id || "new"}`;
+  if (key !== prevKey) {
+    setPrevKey(key);
     if (topic) {
       setName(topic.name);
       setKeywords(topic.keywords.join(", "));
@@ -42,7 +46,7 @@ export default function TopicModal({ isOpen, onClose, onSubmit, topic }: TopicMo
       setCategory("Technology");
       setIsActive(true);
     }
-  }, [topic, isOpen]);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,4 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,9 +11,3 @@ export function createBrowserSupabaseClient() {
 
 // Legacy export for backward compatibility
 export const supabase = createBrowserSupabaseClient();
-
-// Server-side Supabase client (uses service role key, bypasses RLS)
-export function createServerClient() {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient<Database>(supabaseUrl, serviceRoleKey);
-}

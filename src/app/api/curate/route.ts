@@ -1,26 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { fetchMultipleFeeds } from "@/lib/rss";
 import { summarizeArticle, scoreRelevance } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
-    const { topicId, userId } = await request.json();
+    const { user, supabase, error: authError } = await getAuthenticatedUser(request);
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!topicId || !userId) {
+    const { topicId } = await request.json();
+
+    if (!topicId) {
       return NextResponse.json(
-        { error: "topicId and userId are required" },
+        { error: "topicId is required" },
         { status: 400 }
       );
     }
 
-    const supabase = createServerClient();
-
-    // 1. Get topic details
+    // 1. Get topic details (RLS ensures user can only access own topics)
     const { data: topic, error: topicError } = await supabase
       .from("topics")
       .select("*")
       .eq("id", topicId)
+      .eq("user_id", user.id)
       .single();
 
     if (topicError || !topic) {
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
       const { data: article } = await supabase
         .from("articles")
         .insert({
-          user_id: userId,
+          user_id: user.id,
           topic_id: topicId,
           title: item.title,
           summary,

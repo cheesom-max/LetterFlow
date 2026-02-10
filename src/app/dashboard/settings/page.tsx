@@ -8,24 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { useUser } from "@/hooks/useUser";
 import type { Profile, PlatformConnection } from "@/lib/database.types";
-
-const platformMeta: Record<string, { label: string; description: string; color: string }> = {
-  beehiiv: {
-    label: "Beehiiv",
-    description: "Connect your Beehiiv account to publish directly",
-    color: "bg-amber-500",
-  },
-  substack: {
-    label: "Substack",
-    description: "Publish newsletters to your Substack",
-    color: "bg-orange-500",
-  },
-  kit: {
-    label: "Kit (ConvertKit)",
-    description: "Send newsletters via Kit email platform",
-    color: "bg-blue-500",
-  },
-};
+import { PLATFORM_META } from "@/lib/constants";
 
 export default function SettingsPage() {
   const { supabase, user } = useUser();
@@ -45,6 +28,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [publicationId, setPublicationId] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -52,7 +36,7 @@ export default function SettingsPage() {
     const fetchData = async () => {
       const [profileRes, connectionsRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase.from("platform_connections").select("*"),
+        supabase.from("platform_connections").select("*").eq("user_id", user.id),
       ]);
 
       if (profileRes.data) {
@@ -71,11 +55,16 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
-    await supabase.from("profiles").update({
+    setSaveError(null);
+    const { error } = await supabase.from("profiles").update({
       full_name: fullName,
       newsletter_name: newsletterName,
     }).eq("id", user.id);
     setSaving(false);
+    if (error) {
+      setSaveError("Failed to save profile");
+      return;
+    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
   };
@@ -83,15 +72,20 @@ export default function SettingsPage() {
   const handleConnect = async () => {
     if (!user || !apiKey) return;
     setConnecting(true);
-    await supabase.from("platform_connections").insert({
+    setSaveError(null);
+    const { error } = await supabase.from("platform_connections").insert({
       user_id: user.id,
       platform: connectPlatform,
       api_key: apiKey,
       publication_id: publicationId || null,
       is_active: true,
     });
-    // Refresh connections
-    const { data } = await supabase.from("platform_connections").select("*");
+    if (error) {
+      setSaveError("Failed to connect platform");
+      setConnecting(false);
+      return;
+    }
+    const { data } = await supabase.from("platform_connections").select("*").eq("user_id", user.id);
     setConnections(data || []);
     setConnecting(false);
     setConnectModalOpen(false);
@@ -101,7 +95,11 @@ export default function SettingsPage() {
 
   const handleDisconnect = async (id: string) => {
     if (!confirm("Disconnect this platform?")) return;
-    await supabase.from("platform_connections").delete().eq("id", id);
+    const { error } = await supabase.from("platform_connections").delete().eq("id", id).eq("user_id", user!.id);
+    if (error) {
+      setSaveError("Failed to disconnect platform");
+      return;
+    }
     setConnections((prev) => prev.filter((c) => c.id !== id));
   };
 
@@ -158,21 +156,25 @@ export default function SettingsPage() {
               {saving ? "Saving..." : "Save Changes"}
             </Button>
             {saveSuccess && <span className="text-sm text-green-600">Saved!</span>}
+            {saveError && <span className="text-sm text-red-600">{saveError}</span>}
           </div>
         </div>
       </Card>
 
       {/* Style Learning */}
       <Card>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Writing Style Learning
-        </h3>
+        <div className="flex items-center gap-3 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Writing Style Learning
+          </h3>
+          <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">Coming Soon</span>
+        </div>
         <p className="text-sm text-gray-500 mb-6">
           Upload 5-10 of your past newsletters so AI can learn your tone,
           structure, and style.
         </p>
 
-        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-indigo-300 transition-colors cursor-pointer">
+        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center opacity-60">
           <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
@@ -204,7 +206,7 @@ export default function SettingsPage() {
         </h3>
         <div className="space-y-4">
           {(["beehiiv", "substack", "kit"] as const).map((platform) => {
-            const meta = platformMeta[platform];
+            const meta = PLATFORM_META[platform];
             const conn = getConnection(platform);
             return (
               <div
@@ -249,7 +251,7 @@ export default function SettingsPage() {
       <Modal
         isOpen={connectModalOpen}
         onClose={() => setConnectModalOpen(false)}
-        title={`Connect ${platformMeta[connectPlatform]?.label}`}
+        title={`Connect ${PLATFORM_META[connectPlatform]?.label}`}
       >
         <div className="space-y-4">
           <div>

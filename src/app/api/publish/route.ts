@@ -1,25 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase-api";
+import { marked } from "marked";
+import sanitizeHtml from "sanitize-html";
 
 export async function POST(request: NextRequest) {
   try {
-    const { draftId, userId, platform } = await request.json();
+    const { user, supabase, error: authError } = await getAuthenticatedUser(request);
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!draftId || !userId || !platform) {
+    const { draftId, platform } = await request.json();
+
+    if (!draftId || !platform) {
       return NextResponse.json(
-        { error: "draftId, userId, and platform are required" },
+        { error: "draftId and platform are required" },
         { status: 400 }
       );
     }
 
-    const supabase = createServerClient();
-
-    // 1. Get draft
+    // 1. Get draft (RLS ensures user can only access own drafts)
     const { data: draft } = await supabase
       .from("drafts")
       .select("*")
       .eq("id", draftId)
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .single();
 
     if (!draft) {
@@ -30,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { data: connection } = await supabase
       .from("platform_connections")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .eq("platform", platform)
       .eq("is_active", true)
       .single();
@@ -43,13 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Publish based on platform
-    let result;
     let platformPostId: string | null = null;
     let platformUrl: string | null = null;
 
     try {
       if (platform === "beehiiv") {
-        result = await publishToBeehiiv(
+        const result = await publishToBeehiiv(
           connection.api_key,
           connection.publication_id || "",
           draft.title,
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
         platformUrl = result?.data?.web_url || null;
       } else {
         return NextResponse.json(
-          { error: `${platform} publishing not yet supported` },
+          { error: `${platform} publishing is coming soon. Currently only Beehiiv is supported.` },
           { status: 400 }
         );
       }
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
       // 4. Record success in publish_history
       await supabase.from("publish_history").insert({
         draft_id: draftId,
-        user_id: userId,
+        user_id: user.id,
         platform,
         platform_post_id: platformPostId,
         platform_url: platformUrl,
@@ -78,17 +82,18 @@ export async function POST(request: NextRequest) {
       await supabase
         .from("drafts")
         .update({ status: "published" })
-        .eq("id", draftId);
+        .eq("id", draftId)
+        .eq("user_id", user.id);
 
       return NextResponse.json({
         message: `Published to ${platform} successfully`,
-        result,
+        platformUrl,
       });
     } catch (publishError) {
       // Record failure in publish_history
       await supabase.from("publish_history").insert({
         draft_id: draftId,
-        user_id: userId,
+        user_id: user.id,
         platform,
         status: "failed" as const,
         error_message:
@@ -114,16 +119,20 @@ async function publishToBeehiiv(
   title: string,
   content: string
 ) {
-  // Convert markdown to HTML (basic conversion)
-  const htmlContent = content
-    .replace(/^### (.*$)/gm, "<h3>$1</h3>")
-    .replace(/^## (.*$)/gm, "<h2>$1</h2>")
-    .replace(/^# (.*$)/gm, "<h1>$1</h1>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/^/, "<p>")
-    .replace(/$/, "</p>");
+  const rawHtml = await marked.parse(content);
+  const htmlContent = sanitizeHtml(rawHtml, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "h1",
+      "h2",
+      "h3",
+      "img",
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      img: ["src", "alt"],
+      a: ["href", "target", "rel"],
+    },
+  });
 
   const res = await fetch(
     `https://api.beehiiv.com/v2/publications/${publicationId}/posts`,
@@ -142,8 +151,9 @@ async function publishToBeehiiv(
   );
 
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Beehiiv API error: ${error}`);
+    const errorText = await res.text();
+    console.error("Beehiiv API error:", errorText);
+    throw new Error("Failed to publish to Beehiiv");
   }
 
   return res.json();

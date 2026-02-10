@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { generateSubjectLines } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
+    const { error: authError } = await getAuthenticatedUser(request);
+    if (authError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { title, content } = await request.json();
 
     if (!title || !content) {

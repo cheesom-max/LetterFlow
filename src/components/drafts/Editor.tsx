@@ -7,6 +7,8 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { useDraft } from "@/hooks/useDraft";
 import { useUser } from "@/hooks/useUser";
+import { DRAFT_STATUS_MAP } from "@/lib/constants";
+import { countWords } from "@/lib/utils";
 
 interface EditorProps {
   draftId: string;
@@ -22,6 +24,8 @@ export default function Editor({ draftId }: EditorProps) {
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Sync content from loaded draft
   useEffect(() => {
@@ -38,36 +42,70 @@ export default function Editor({ draftId }: EditorProps) {
   const handleGenerateSubjectLines = async () => {
     if (!draft) return;
     setSubjectLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/subject-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: draft.title, content }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSubjectLines(data.subjectLines || []);
-        setSubjectModalOpen(true);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to generate subject lines");
+        return;
       }
+      const data = await res.json();
+      setSubjectLines(data.subjectLines || []);
+      setSubjectModalOpen(true);
     } finally {
       setSubjectLoading(false);
+    }
+  };
+
+  const handleAiTransform = async (action: "rewrite" | "shorten" | "tldr") => {
+    if (!content.trim()) return;
+    setAiLoading(action);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai-transform", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, content }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "AI transformation failed");
+        return;
+      }
+      const data = await res.json();
+      if (action === "tldr") {
+        setContent(data.result + "\n\n---\n\n" + content);
+      } else {
+        setContent(data.result);
+      }
+    } finally {
+      setAiLoading(null);
     }
   };
 
   const handlePublish = async (platform: "beehiiv" | "substack" | "kit") => {
     if (!user || !draft) return;
     setPublishing(true);
+    setError(null);
     try {
       const res = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId: draft.id, userId: user.id, platform }),
+        body: JSON.stringify({ draftId: draft.id, platform }),
       });
-      if (res.ok) {
-        await updateStatus("published");
-        setPublishModalOpen(false);
-        router.push("/dashboard/drafts");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to publish");
+        return;
       }
+      await updateStatus("published");
+      setPublishModalOpen(false);
+      router.push("/dashboard/drafts");
     } finally {
       setPublishing(false);
     }
@@ -92,24 +130,17 @@ export default function Editor({ draftId }: EditorProps) {
     );
   }
 
-  const statusMap: Record<string, "default" | "success" | "warning" | "info"> = {
-    draft: "default",
-    review: "warning",
-    scheduled: "info",
-    published: "success",
-  };
-
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-10rem)]">
       {/* Editor panel */}
       <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <Badge variant={statusMap[draft.status] || "default"}>
-              {draft.status.charAt(0).toUpperCase() + draft.status.slice(1)}
+            <Badge variant={DRAFT_STATUS_MAP[draft.status]?.variant || "default"}>
+              {DRAFT_STATUS_MAP[draft.status]?.label || draft.status}
             </Badge>
             <span className="text-sm text-gray-400">
-              {content.trim().split(/\s+/).filter(Boolean).length} words
+              {countWords(content)} words
             </span>
             {saveStatus === "saving" && (
               <span className="text-xs text-amber-500">Saving...</span>
@@ -144,17 +175,25 @@ export default function Editor({ draftId }: EditorProps) {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">AI Assist</h3>
           <div className="space-y-2">
-            <button className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer">
+            <button
+              onClick={() => handleAiTransform("rewrite")}
+              disabled={aiLoading !== null}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer disabled:opacity-50"
+            >
               <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Rewrite in my style
+              {aiLoading === "rewrite" ? "Rewriting..." : "Rewrite in my style"}
             </button>
-            <button className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer">
+            <button
+              onClick={() => handleAiTransform("shorten")}
+              disabled={aiLoading !== null}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer disabled:opacity-50"
+            >
               <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
               </svg>
-              Make it shorter
+              {aiLoading === "shorten" ? "Shortening..." : "Make it shorter"}
             </button>
             <button
               onClick={handleGenerateSubjectLines}
@@ -166,11 +205,15 @@ export default function Editor({ draftId }: EditorProps) {
               </svg>
               {subjectLoading ? "Generating..." : "Generate subject lines"}
             </button>
-            <button className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer">
+            <button
+              onClick={() => handleAiTransform("tldr")}
+              disabled={aiLoading !== null}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left hover:bg-indigo-50 text-gray-700 hover:text-indigo-700 transition-colors cursor-pointer disabled:opacity-50"
+            >
               <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              Add TL;DR summary
+              {aiLoading === "tldr" ? "Generating..." : "Add TL;DR summary"}
             </button>
           </div>
         </div>
@@ -207,6 +250,18 @@ export default function Editor({ draftId }: EditorProps) {
           )}
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3">
+          <span className="text-sm flex-1">{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 cursor-pointer shrink-0">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Subject Lines Modal */}
       <Modal isOpen={subjectModalOpen} onClose={() => setSubjectModalOpen(false)} title="Subject Line Suggestions">

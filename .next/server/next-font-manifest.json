@@ -1,0 +1,40 @@
+{
+  "app": {
+    "[project]/Desktop/Projects/LetterFlow/src/app/_not-found/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/auth/login/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/auth/signup/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/drafts/[id]/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/drafts/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/feed/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/onboarding/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/settings/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/dashboard/topics/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ],
+    "[project]/Desktop/Projects/LetterFlow/src/app/page": [
+      "static/media/caa3a2e1cccd8315-s.p.853070df.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

@@ -1,41 +1,39 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Environment & secrets
+.env
+.env.local
+.env.*.local
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Node
+node_modules/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# OS
+.DS_Store
+Thumbs.db
 
-# vercel
-.vercel
+# IDE
+.vscode/
+.idea/
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Generated outputs (각 에이전트 실행 결과물)
+raw_ideas.md
+final_ideas.md
+mvp_spec.md
+gtm_strategy.md
+code_review_report.md
+maintenance_report.md
+feedback_report.md
+pricing_strategy.md
+growth_experiments.md
+finance_report.md
+project/
+landing/
+content/
+outreach/
+support/
+analytics/
+legal/
+infra/
+launch/
+retention/
+growth/

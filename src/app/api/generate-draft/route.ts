@@ -1,32 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { generateDraft } from "@/lib/openai";
+import { countWords } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, articleIds } = await request.json();
+    const { user, supabase, error: authError } = await getAuthenticatedUser(request);
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!userId || !articleIds?.length) {
+    const { articleIds } = await request.json();
+
+    if (!articleIds?.length) {
       return NextResponse.json(
-        { error: "userId and articleIds are required" },
+        { error: "articleIds are required" },
         { status: 400 }
       );
     }
-
-    const supabase = createServerClient();
 
     // 1. Get user profile (for style and newsletter name)
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", userId)
+      .eq("id", user.id)
       .single();
 
-    // 2. Get selected articles
+    // 2. Get selected articles (RLS ensures user can only access own articles)
     const { data: articles, error: articlesError } = await supabase
       .from("articles")
       .select("*")
       .in("id", articleIds)
+      .eq("user_id", user.id)
       .order("relevance_score", { ascending: false });
 
     if (articlesError || !articles?.length) {
@@ -43,13 +48,13 @@ export async function POST(request: NextRequest) {
       profile?.newsletter_name || null
     );
 
-    const wordCount = content.split(/\s+/).length;
+    const wordCount = countWords(content);
 
     // 4. Save draft to database
     const { data: draft, error: draftError } = await supabase
       .from("drafts")
       .insert({
-        user_id: userId,
+        user_id: user.id,
         title,
         content,
         status: "draft" as const,

@@ -1,3 +1,6 @@
+import { validateRSSUrl } from "./url-validator";
+import { RSS_CONFIG, TIMING } from "./constants";
+
 interface RSSItem {
   title: string;
   link: string;
@@ -8,9 +11,15 @@ interface RSSItem {
 
 export async function fetchRSSFeed(feedUrl: string): Promise<RSSItem[]> {
   try {
+    const validation = await validateRSSUrl(feedUrl);
+    if (!validation.valid) {
+      console.warn(`Blocked RSS fetch: ${feedUrl} - ${validation.reason}`);
+      return [];
+    }
+
     const res = await fetch(feedUrl, {
-      headers: { "User-Agent": "LetterFlow/1.0" },
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      headers: { "User-Agent": RSS_CONFIG.USER_AGENT },
+      next: { revalidate: TIMING.RSS_CACHE_SEC },
     });
 
     if (!res.ok) return [];
@@ -53,7 +62,7 @@ function parseRSSXml(xml: string, feedUrl: string): RSSItem[] {
     }
   }
 
-  return items.slice(0, 20); // Limit to 20 items per feed
+  return items.slice(0, RSS_CONFIG.MAX_ITEMS);
 }
 
 function extractTag(xml: string, tag: string): string {

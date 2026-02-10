@@ -3,6 +3,7 @@ export type Profile = {
   email: string;
   full_name: string | null;
   newsletter_name: string | null;
+  interests: string[];
   plan: "free" | "starter" | "pro" | "team";
   style_profile: string | null;
   created_at: string;

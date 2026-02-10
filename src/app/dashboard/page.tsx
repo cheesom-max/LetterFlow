@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import StatsCard from "@/components/dashboard/StatsCard";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import { useStats } from "@/hooks/useStats";
@@ -38,7 +39,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="space-y-3">
-            <a
+            <Link
               href="/dashboard/feed"
               className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
             >
@@ -51,8 +52,8 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-gray-900">Run AI Curation</p>
                 <p className="text-xs text-gray-500">Scan sources for new content</p>
               </div>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/dashboard/drafts"
               className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
             >
@@ -65,8 +66,8 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-gray-900">Generate Draft</p>
                 <p className="text-xs text-gray-500">Create a new AI-written draft</p>
               </div>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/dashboard/topics"
               className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
             >
@@ -79,7 +80,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-gray-900">Add Topic</p>
                 <p className="text-xs text-gray-500">Monitor a new subject area</p>
               </div>
-            </a>
+            </Link>
           </div>
         </div>
       </div>

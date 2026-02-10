@@ -18,6 +18,7 @@ export default function FeedPage() {
   const [searchInput, setSearchInput] = useState("");
   const [curateModalOpen, setCurateModalOpen] = useState(false);
   const [selectedArticles, setSelectedArticles] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -34,15 +35,19 @@ export default function FeedPage() {
 
   const handleGenerateDraft = async () => {
     if (!user || selectedArticles.length === 0) return;
+    setError(null);
     const res = await fetch("/api/generate-draft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, articleIds: selectedArticles }),
+      body: JSON.stringify({ articleIds: selectedArticles }),
     });
-    if (res.ok) {
-      const { draft } = await res.json();
-      router.push(`/dashboard/drafts/${draft.id}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Failed to generate draft");
+      return;
     }
+    const { draft } = await res.json();
+    router.push(`/dashboard/drafts/${draft.id}`);
   };
 
   const toggleSelectArticle = (id: string) => {
@@ -98,6 +103,18 @@ export default function FeedPage() {
           </Button>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3">
+          <span className="text-sm flex-1">{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 cursor-pointer">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2">

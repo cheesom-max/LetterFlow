@@ -10,29 +10,48 @@ export function useTopics() {
   const { supabase, user } = useUser();
   const [topics, setTopics] = useState<TopicWithCount[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const fetchTopics = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from("topics")
-      .select("*, articles(count)")
-      .order("created_at", { ascending: false });
-
-    const mapped = (data || []).map((t) => ({
-      ...t,
-      article_count: (t as Record<string, unknown>).articles
-        ? ((t as Record<string, unknown>).articles as { count: number }[])[0]?.count ?? 0
-        : 0,
-    })) as TopicWithCount[];
-
-    setTopics(mapped);
-    setLoading(false);
-  }, [supabase, user]);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    fetchTopics();
-  }, [fetchTopics]);
+    if (!user) return;
+    let active = true;
+
+    (async () => {
+      try {
+        const { data, error: queryError } = await supabase
+          .from("topics")
+          .select("*, articles(count)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (!active) return;
+        if (queryError) throw queryError;
+
+        const mapped = (data || []).map((t) => ({
+          ...t,
+          article_count: (t as Record<string, unknown>).articles
+            ? ((t as Record<string, unknown>).articles as { count: number }[])[0]?.count ?? 0
+            : 0,
+        })) as TopicWithCount[];
+
+        setTopics(mapped);
+        setError(null);
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load topics");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [supabase, user, refreshKey]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   const addTopic = async (data: {
     name: string;
@@ -46,7 +65,7 @@ export function useTopics() {
       user_id: user.id,
       ...data,
     });
-    if (!error) await fetchTopics();
+    if (!error) refresh();
     return error;
   };
 
@@ -60,16 +79,18 @@ export function useTopics() {
       is_active: boolean;
     }>
   ) => {
-    const { error } = await supabase.from("topics").update(data).eq("id", id);
-    if (!error) await fetchTopics();
+    if (!user) return;
+    const { error } = await supabase.from("topics").update(data).eq("id", id).eq("user_id", user.id);
+    if (!error) refresh();
     return error;
   };
 
   const deleteTopic = async (id: string) => {
-    const { error } = await supabase.from("topics").delete().eq("id", id);
-    if (!error) await fetchTopics();
+    if (!user) return;
+    const { error } = await supabase.from("topics").delete().eq("id", id).eq("user_id", user.id);
+    if (!error) refresh();
     return error;
   };
 
-  return { topics, loading, addTopic, updateTopic, deleteTopic, refresh: fetchTopics };
+  return { topics, loading, error, addTopic, updateTopic, deleteTopic, refresh };
 }
