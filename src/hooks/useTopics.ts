@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useUser } from "./useUser";
 import type { Topic } from "@/lib/database.types";
+import { PLAN_LIMITS, type Plan } from "@/lib/plan-limits";
 
 export type TopicWithCount = Topic & { article_count: number };
 
@@ -12,6 +13,7 @@ export function useTopics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [userPlan, setUserPlan] = useState<Plan>("free");
 
   useEffect(() => {
     if (!user) return;
@@ -19,6 +21,14 @@ export function useTopics() {
 
     (async () => {
       try {
+        // Fetch user plan
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("plan")
+          .eq("id", user.id)
+          .single();
+        if (profile?.plan) setUserPlan(profile.plan as Plan);
+
         const { data, error: queryError } = await supabase
           .from("topics")
           .select("*, articles(count)")
@@ -61,6 +71,13 @@ export function useTopics() {
     is_active: boolean;
   }) => {
     if (!user) return;
+
+    // Check topic limit
+    const topicLimit = PLAN_LIMITS[userPlan].topics as number;
+    if (topicLimit !== -1 && topics.length >= topicLimit) {
+      return { message: `Topic limit reached (${topics.length}/${topicLimit}). Upgrade your plan to add more topics.` };
+    }
+
     const { error } = await supabase.from("topics").insert({
       user_id: user.id,
       ...data,

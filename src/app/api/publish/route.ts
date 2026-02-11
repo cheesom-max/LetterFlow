@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
+import { checkPlanLimit } from "@/lib/plan-limits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "draftId and platform are required" },
         { status: 400 }
+      );
+    }
+
+    // Check plan limit
+    const planCheck = await checkPlanLimit(supabase, user.id, "platforms");
+    if (!planCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: "Publishing requires a Starter plan or higher. Upgrade your plan to publish.",
+          upgrade: true,
+        },
+        { status: 403 }
       );
     }
 
@@ -61,9 +74,17 @@ export async function POST(request: NextRequest) {
         );
         platformPostId = result?.data?.id || null;
         platformUrl = result?.data?.web_url || null;
+      } else if (platform === "kit") {
+        const result = await publishToKit(
+          connection.api_key,
+          draft.title,
+          draft.content
+        );
+        platformPostId = result?.broadcast?.id?.toString() || null;
+        platformUrl = null;
       } else {
         return NextResponse.json(
-          { error: `${platform} publishing is coming soon. Currently only Beehiiv is supported.` },
+          { error: `${platform} publishing is not yet supported.` },
           { status: 400 }
         );
       }
@@ -154,6 +175,48 @@ async function publishToBeehiiv(
     const errorText = await res.text();
     console.error("Beehiiv API error:", errorText);
     throw new Error("Failed to publish to Beehiiv");
+  }
+
+  return res.json();
+}
+
+async function publishToKit(
+  apiKey: string,
+  title: string,
+  content: string
+) {
+  const rawHtml = await marked.parse(content);
+  const htmlContent = sanitizeHtml(rawHtml, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "h1",
+      "h2",
+      "h3",
+      "img",
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      img: ["src", "alt"],
+      a: ["href", "target", "rel"],
+    },
+  });
+
+  const res = await fetch("https://api.kit.com/v4/broadcasts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      content: htmlContent,
+      subject: title,
+      description: title,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Kit API error:", errorText);
+    throw new Error("Failed to publish to Kit");
   }
 
   return res.json();

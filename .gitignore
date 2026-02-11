@@ -3,6 +3,10 @@
 .env.local
 .env.*.local
 
+# Next.js
+.next/
+out/
+
 # Node
 node_modules/
 npm-debug.log*

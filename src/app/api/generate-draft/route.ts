@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { generateDraft } from "@/lib/openai";
 import { countWords } from "@/lib/utils";
+import { checkPlanLimit } from "@/lib/plan-limits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "articleIds are required" },
         { status: 400 }
+      );
+    }
+
+    // Check plan limit
+    const planCheck = await checkPlanLimit(supabase, user.id, "drafts");
+    if (!planCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Plan limit reached (${planCheck.used}/${planCheck.limit} drafts this month). Upgrade your plan to continue.`,
+          upgrade: true,
+        },
+        { status: 403 }
       );
     }
 

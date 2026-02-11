@@ -225,4 +225,31 @@ export async function generateTldr(content: string): Promise<string> {
   }
 }
 
+export async function analyzeWritingStyle(
+  samples: string
+): Promise<string> {
+  try {
+    const res = await openai.chat.completions.create({
+      model: OPENAI_MODELS.GPT_4O,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Analyze the following newsletter samples and extract a writing style profile. Describe: tone, sentence structure, vocabulary level, paragraph length, use of humor, formatting habits, and overall voice. Return a concise style profile in 2-3 sentences that can be used as instructions for an AI writer to mimic this style.",
+        },
+        {
+          role: "user",
+          content: `Here are newsletter samples to analyze:\n\n${samples}`,
+        },
+      ],
+      max_tokens: OPENAI_PARAMS.STYLE_ANALYSIS.maxTokens,
+      temperature: OPENAI_PARAMS.STYLE_ANALYSIS.temperature,
+    });
+    return res.choices[0]?.message?.content || "";
+  } catch (error) {
+    console.error("analyzeWritingStyle error:", error);
+    throw new Error("Failed to analyze writing style");
+  }
+}
+
 export default openai;

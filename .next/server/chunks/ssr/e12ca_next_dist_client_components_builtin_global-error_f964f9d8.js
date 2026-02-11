@@ -1,3 +1,0 @@
-module.exports=[47827,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(73681);a.n(d("[project]/Desktop/Projects/LetterFlow/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},46344,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(73681);a.n(d("[project]/Desktop/Projects/LetterFlow/node_modules/next/dist/client/components/builtin/global-error.js"))},59479,a=>{"use strict";a.i(47827);var b=a.i(46344);a.n(b)}];
-
-//# sourceMappingURL=e12ca_next_dist_client_components_builtin_global-error_f964f9d8.js.map

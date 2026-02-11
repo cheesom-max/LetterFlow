@@ -13,6 +13,7 @@ export const OPENAI_PARAMS = {
   REWRITE: { maxTokens: 2000, temperature: 0.7 },
   SHORTEN: { maxTokens: 1500, temperature: 0.3 },
   TLDR: { maxTokens: 200, temperature: 0.3 },
+  STYLE_ANALYSIS: { maxTokens: 300, temperature: 0.5 },
 } as const;
 
 // Draft Status Configuration
@@ -38,7 +39,7 @@ export const PLATFORM_META: Record<
   },
   substack: {
     label: "Substack",
-    description: "Publish newsletters to your Substack",
+    description: "Publish newsletters to your Substack (Coming Soon)",
     color: "bg-orange-500",
   },
   kit: {

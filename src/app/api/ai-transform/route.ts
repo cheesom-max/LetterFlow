@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { rewriteInStyle, makeShorter, generateTldr } from "@/lib/openai";
 import { AI_ACTIONS, DEFAULT_STYLE_PROFILE, ERROR_MESSAGES } from "@/lib/constants";
+import { checkPlanLimit } from "@/lib/plan-limits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +18,20 @@ export async function POST(request: NextRequest) {
 
     if (!AI_ACTIONS.includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    // Rewrite requires style learning (starter+ plan)
+    if (action === "rewrite") {
+      const planCheck = await checkPlanLimit(supabase, user.id, "styleLearning");
+      if (!planCheck.allowed) {
+        return NextResponse.json(
+          {
+            error: "Style rewriting requires a Starter plan or higher. Upgrade to unlock this feature.",
+            upgrade: true,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     let result: string;

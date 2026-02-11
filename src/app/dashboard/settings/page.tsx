@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -9,6 +9,7 @@ import Modal from "@/components/ui/Modal";
 import { useUser } from "@/hooks/useUser";
 import type { Profile, PlatformConnection } from "@/lib/database.types";
 import { PLATFORM_META } from "@/lib/constants";
+import { PLAN_LIMITS, type Plan } from "@/lib/plan-limits";
 
 export default function SettingsPage() {
   const { supabase, user } = useUser();
@@ -29,6 +30,11 @@ export default function SettingsPage() {
   const [publicationId, setPublicationId] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Style learning
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [styleLoading, setStyleLoading] = useState(false);
+  const [styleError, setStyleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -73,6 +79,17 @@ export default function SettingsPage() {
     if (!user || !apiKey) return;
     setConnecting(true);
     setSaveError(null);
+
+    // Check platform connection limit
+    const userPlan = (profile?.plan as Plan) || "free";
+    const platformLimit = PLAN_LIMITS[userPlan].platforms as number;
+    const activeConnections = connections.filter((c) => c.is_active).length;
+    if (platformLimit !== -1 && activeConnections >= platformLimit) {
+      setSaveError(`Platform limit reached (${activeConnections}/${platformLimit}). Upgrade your plan to connect more platforms.`);
+      setConnecting(false);
+      return;
+    }
+
     const { error } = await supabase.from("platform_connections").insert({
       user_id: user.id,
       platform: connectPlatform,
@@ -91,6 +108,35 @@ export default function SettingsPage() {
     setConnectModalOpen(false);
     setApiKey("");
     setPublicationId("");
+  };
+
+  const handleStyleUpload = async (files: FileList | null) => {
+    if (!files?.length || !user) return;
+    setStyleLoading(true);
+    setStyleError(null);
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("files", files[i]);
+    }
+
+    try {
+      const res = await fetch("/api/learn-style", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStyleError(data.error || "Failed to analyze style");
+        return;
+      }
+      setProfile((prev) => prev ? { ...prev, style_profile: data.styleProfile } : prev);
+    } catch {
+      setStyleError("Failed to upload files");
+    } finally {
+      setStyleLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDisconnect = async (id: string) => {
@@ -167,24 +213,43 @@ export default function SettingsPage() {
           <h3 className="text-lg font-semibold text-gray-900">
             Writing Style Learning
           </h3>
-          <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">Coming Soon</span>
+          {((profile?.plan as Plan) || "free") === "free" && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-600 rounded-full">Starter+</span>
+          )}
         </div>
         <p className="text-sm text-gray-500 mb-6">
           Upload 5-10 of your past newsletters so AI can learn your tone,
           structure, and style.
         </p>
 
-        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center opacity-60">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".txt,.md,.html"
+          className="hidden"
+          onChange={(e) => handleStyleUpload(e.target.files)}
+        />
+        <div
+          className={`border-2 border-dashed border-gray-200 rounded-xl p-8 text-center transition-colors ${
+            styleLoading ? "opacity-60 pointer-events-none" : "hover:border-indigo-300 cursor-pointer"
+          }`}
+          onClick={() => fileInputRef.current?.click()}
+        >
           <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
           <p className="text-sm text-gray-600 font-medium">
-            Drop files here or click to upload
+            {styleLoading ? "Analyzing your writing style..." : "Drop files here or click to upload"}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            Supports .txt, .md, .html, .pdf (max 10 files)
+            Supports .txt, .md, .html (max 10 files)
           </p>
         </div>
+
+        {styleError && (
+          <p className="mt-3 text-sm text-red-600">{styleError}</p>
+        )}
 
         {profile?.style_profile && (
           <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
@@ -226,7 +291,9 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-500">{meta.description}</p>
                   </div>
                 </div>
-                {conn ? (
+                {platform === "substack" ? (
+                  <Badge variant="default">Coming Soon</Badge>
+                ) : conn ? (
                   <div className="flex items-center gap-2">
                     <Badge variant="success">Connected</Badge>
                     <button
