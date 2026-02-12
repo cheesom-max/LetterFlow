@@ -3,12 +3,25 @@ import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { fetchMultipleFeeds } from "@/lib/rss";
 import { summarizeArticle, scoreRelevance } from "@/lib/openai";
 import { checkPlanLimit } from "@/lib/plan-limits";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase, error: authError } = await getAuthenticatedUser(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit check (per user, AI-heavy route)
+    const rateCheck = checkRateLimit(user.id, RATE_LIMITS.AI_ROUTE.maxRequests, RATE_LIMITS.AI_ROUTE.windowMs);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((rateCheck.retryAfterMs ?? 0) / 1000)) },
+        }
+      );
     }
 
     const { topicId } = await request.json();
@@ -54,18 +67,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. Summarize and score each article with AI
+    // 3. Summarize and score each article with AI (parallel processing)
+    const articlePromises = rssItems.slice(0, 10).map(async (item) => {
+      const summary = await summarizeArticle(item.title, item.description);
+      const relevanceScore = await scoreRelevance(item.title, summary, topic.keywords);
+      return { item, summary, relevanceScore };
+    });
+
+    const settledResults = await Promise.allSettled(articlePromises);
+
+    // 4. Save successful results to database
     const articles = [];
 
-    for (const item of rssItems.slice(0, 10)) {
-      const summary = await summarizeArticle(item.title, item.description);
-      const relevanceScore = await scoreRelevance(
-        item.title,
-        summary,
-        topic.keywords
-      );
+    for (const result of settledResults) {
+      if (result.status !== "fulfilled") continue;
+      const { item, summary, relevanceScore } = result.value;
 
-      // 4. Save to database
       const { data: article } = await supabase
         .from("articles")
         .insert({

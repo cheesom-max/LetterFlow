@@ -81,16 +81,35 @@ export function useStats() {
         },
       ]);
 
-      const activityItems: Activity[] = [];
-
-      const { data: recentTopics } = await supabase
-        .from("topics")
-        .select("name, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(3);
+      // Fetch recent activity queries in parallel
+      const [
+        { data: recentTopics },
+        { data: recentArticles },
+        { data: recentDrafts },
+      ] = await Promise.all([
+        supabase
+          .from("topics")
+          .select("name, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
+          .from("articles")
+          .select("title, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
+          .from("drafts")
+          .select("title, status, updated_at")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(3),
+      ]);
 
       if (!active) return;
+
+      const activityItems: Activity[] = [];
 
       (recentTopics || []).forEach((t) => {
         activityItems.push({
@@ -100,15 +119,6 @@ export function useStats() {
         });
       });
 
-      const { data: recentArticles } = await supabase
-        .from("articles")
-        .select("title, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (!active) return;
-
       (recentArticles || []).forEach((a) => {
         activityItems.push({
           type: "curated",
@@ -116,15 +126,6 @@ export function useStats() {
           time: formatRelative(a.created_at),
         });
       });
-
-      const { data: recentDrafts } = await supabase
-        .from("drafts")
-        .select("title, status, updated_at")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(3);
-
-      if (!active) return;
 
       (recentDrafts || []).forEach((d) => {
         activityItems.push({

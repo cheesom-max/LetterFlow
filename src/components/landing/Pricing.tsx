@@ -19,7 +19,7 @@ const plans = [
   },
   {
     name: "Starter",
-    price: "$19",
+    price: "$9",
     period: "/month",
     description: "For growing newsletter creators",
     features: [
@@ -35,7 +35,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "$49",
+    price: "$19",
     period: "/month",
     description: "For serious newsletter operators",
     features: [
@@ -53,7 +53,7 @@ const plans = [
   },
   {
     name: "Team",
-    price: "$99",
+    price: "$39",
     period: "/month",
     description: "For teams & agencies",
     features: [

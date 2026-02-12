@@ -3,12 +3,43 @@ import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { checkPlanLimit } from "@/lib/plan-limits";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+
+// Shared Markdown-to-HTML conversion with sanitization
+async function markdownToSafeHtml(content: string): Promise<string> {
+  const rawHtml = await marked.parse(content);
+  return sanitizeHtml(rawHtml, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "h1",
+      "h2",
+      "h3",
+      "img",
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      img: ["src", "alt"],
+      a: ["href", "target", "rel"],
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase, error: authError } = await getAuthenticatedUser(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit check (per user, standard route)
+    const rateCheck = checkRateLimit(user.id, RATE_LIMITS.STANDARD_ROUTE.maxRequests, RATE_LIMITS.STANDARD_ROUTE.windowMs);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((rateCheck.retryAfterMs ?? 0) / 1000)) },
+        }
+      );
     }
 
     const { draftId, platform } = await request.json();
@@ -140,20 +171,7 @@ async function publishToBeehiiv(
   title: string,
   content: string
 ) {
-  const rawHtml = await marked.parse(content);
-  const htmlContent = sanitizeHtml(rawHtml, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      "h1",
-      "h2",
-      "h3",
-      "img",
-    ]),
-    allowedAttributes: {
-      ...sanitizeHtml.defaults.allowedAttributes,
-      img: ["src", "alt"],
-      a: ["href", "target", "rel"],
-    },
-  });
+  const htmlContent = await markdownToSafeHtml(content);
 
   const res = await fetch(
     `https://api.beehiiv.com/v2/publications/${publicationId}/posts`,
@@ -185,20 +203,7 @@ async function publishToKit(
   title: string,
   content: string
 ) {
-  const rawHtml = await marked.parse(content);
-  const htmlContent = sanitizeHtml(rawHtml, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      "h1",
-      "h2",
-      "h3",
-      "img",
-    ]),
-    allowedAttributes: {
-      ...sanitizeHtml.defaults.allowedAttributes,
-      img: ["src", "alt"],
-      a: ["href", "target", "rel"],
-    },
-  });
+  const htmlContent = await markdownToSafeHtml(content);
 
   const res = await fetch("https://api.kit.com/v4/broadcasts", {
     method: "POST",

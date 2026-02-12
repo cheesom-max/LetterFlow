@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createBrowserSupabaseClient } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import { useUser } from "@/hooks/useUser";
 
 const navigation = [
   {
@@ -63,18 +61,7 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const supabase = createBrowserSupabaseClient();
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  const { supabase, user } = useUser();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

@@ -11,7 +11,7 @@ export function useDraft(draftId: string) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [sourceArticles, setSourceArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -66,11 +66,19 @@ export function useDraft(draftId: string) {
       if (!draftId || !user) return;
       setSaveStatus("saving");
       const wordCount = countWords(content);
-      await supabase
+      const { error: saveError } = await supabase
         .from("drafts")
         .update({ content, word_count: wordCount })
         .eq("id", draftId)
         .eq("user_id", user.id);
+
+      if (saveError) {
+        setSaveStatus("error");
+        console.error("Save failed:", saveError);
+        setTimeout(() => setSaveStatus("idle"), TIMING.SAVE_DISPLAY_MS);
+        return;
+      }
+
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), TIMING.SAVE_DISPLAY_MS);
     },

@@ -3,12 +3,25 @@ import { getAuthenticatedUser } from "@/lib/supabase-api";
 import { generateDraft } from "@/lib/openai";
 import { countWords } from "@/lib/utils";
 import { checkPlanLimit } from "@/lib/plan-limits";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase, error: authError } = await getAuthenticatedUser(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit check (per user, AI-heavy route)
+    const rateCheck = checkRateLimit(user.id, RATE_LIMITS.AI_ROUTE.maxRequests, RATE_LIMITS.AI_ROUTE.windowMs);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((rateCheck.retryAfterMs ?? 0) / 1000)) },
+        }
+      );
     }
 
     const { articleIds } = await request.json();
@@ -84,7 +97,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Save draft ↔ article relationships (M:N 중간 테이블)
+    // 5. Save draft ↔ article relationships (M:N junction table)
     const draftArticleRows = articleIds.map((articleId: string) => ({
       draft_id: draft.id,
       article_id: articleId,

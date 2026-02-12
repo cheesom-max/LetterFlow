@@ -5,31 +5,31 @@
 ## Phase 1: 기획
 | 에이전트 | 상태 | 산출물 | 실행일 |
 |----------|------|--------|--------|
-| ai-solo-biz-researcher | 미실행 | raw_ideas.md | — |
-| ai-biz-idea-evaluator | 미실행 | final_ideas.md | — |
-| mvp-spec-writer | 미실행 | mvp_spec.md | — |
-| landing-page-builder | 미실행 | landing/ | — |
-| gtm-strategist | 미실행 | gtm_strategy.md | — |
+| ai-solo-biz-researcher | N/A (기존 코드 기반) | — | — |
+| ai-biz-idea-evaluator | N/A (기존 코드 기반) | — | — |
+| mvp-spec-writer | **완료** | mvp_spec.md | 2026-02-11 |
+| landing-page-builder | N/A (기존 랜딩 포함) | src/app/page.tsx | — |
+| gtm-strategist | **완료** | gtm_strategy.md | 2026-02-11 |
 
 ## Phase 2: 구축
 | 에이전트 | 상태 | 산출물 | 실행일 |
 |----------|------|--------|--------|
-| product-builder | 미실행 | project/ | — |
-| code-reviewer | 미실행 | code_review_report.md | — |
-| code-maintainer | 미실행 | maintenance_report.md | — |
-| devops-deployer | 미실행 | infra/ | — |
-| content-marketer | 미실행 | content/ | — |
-| launch-executor | 미실행 | launch/ | — |
+| product-builder | N/A (기존 코드 빌드 완료) | src/ | — |
+| code-reviewer | **완료** | code_review_report.md + 70 tests | 2026-02-11 |
+| code-maintainer | **완료** | P0/P1 8건 수정 + 81 tests | 2026-02-11 |
+| devops-deployer | **완료** | infra/ (10개 파일) | 2026-02-11 |
+| content-marketer | **완료** | content/ (11개 파일) | 2026-02-11 |
+| launch-executor | **완료** | launch/ (6개 파일) | 2026-02-11 |
 
 ## Phase 3: 운영
 | 에이전트 | 상태 | 산출물 | 실행일 |
 |----------|------|--------|--------|
-| analytics-advisor | 미실행 | analytics/ | — |
-| pricing-optimizer | 미실행 | pricing_strategy.md | — |
-| churn-preventer | 미실행 | retention/ | — |
+| analytics-advisor | **완료** | analytics/ (5개 파일) | 2026-02-11 |
+| pricing-optimizer | **완료** | pricing_strategy.md | 2026-02-11 |
+| churn-preventer | **완료** | retention/ (5개 파일) | 2026-02-11 |
 
 ## Phase 4: 성장
 | 에이전트 | 상태 | 산출물 | 실행일 |
 |----------|------|--------|--------|
-| growth-sales | 미실행 | growth/ | — |
-| feedback-analyzer | 미실행 | feedback_report.md | — |
+| growth-sales | **완료** | growth/ (7개 파일) | 2026-02-11 |
+| feedback-analyzer | 대기 | feedback_report.md | — (피드백 데이터 수집 후) |
